@@ -1,0 +1,22 @@
+filebeat.prospectors:
+- type: log
+  enabled: true
+  tags:
+    - log_generator
+  paths:
+    - /usr/share/services/log_generator/logs/access.log
+
+output.kafka:
+  # specifying filebeat to take timestamp and message fields, other wise it
+  # take the lines as json and publish to kafka
+  codec.format:
+    string: '%{[@timestamp]} %{[message]}'
+
+  # kafka
+  hosts: ["10.8.160.142:9092"]
+  topic: 'log'
+  partition.round_robin:
+    reachable_only: false
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000

@@ -1,0 +1,80 @@
+nginx_emulator:
+    image: nginx_emulator:latest
+    container_name: nginx_emulator
+    volumes:
+        - '/tmp/log:/app/log'
+
+zookeeper:
+    image: confluentinc/cp-zookeeper:5.1.0
+    container_name: zookeeper
+    environment:
+        - ZOOKEEPER_CLIENT_PORT=2181
+    ports:
+        - 2181:2181
+
+kafka:
+    image: confluentinc/cp-kafka:5.1.0
+    container_name: kafka
+    environment:
+        - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+        - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://10.8.160.142:9092
+        - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    ports:
+        - 9092:9092
+    links:
+        - zookeeper
+
+filebeat:
+    image: docker.elastic.co/beats/filebeat:6.6.0
+    container_name: filebeat
+    user: root
+    environment:
+        - strict.perms=false
+    volumes:
+        - './filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro'
+        - '/tmp/filebeat:/usr/share/filebeat/data:rw'
+        - '/tmp/log:/usr/share/services/log_generator/logs'
+
+elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.4.3
+    environment:
+        - cluster.name=docker-cluster
+        - bootstrap.memory_lock=true
+        - xpack.security.enabled=false
+        - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+        memlock:
+            soft: -1
+            hard: -1
+    mem_limit: 1g
+    volumes:
+        - "./esdata:/usr/share/elasticsearch/data"
+    ports:
+        - "9200:9200"
+
+# kibana:
+#     image: docker.elastic.co/kibana/kibana:5.4.2
+#     volumes:
+#         - "./kibana.yml:/usr/share/kibana/config/kibana.yml"
+#     restart: always
+#     ports:
+#         - "5601:5601"
+#     links:
+#         - elasticsearch
+#     # depends_on:
+#     #     elasticsearch:
+#     #       condition: service_healthy
+
+logstash:
+    image: docker.elastic.co/logstash/logstash:5.1.1
+    container_name: logstash
+    command: logstash -f /config-dir/logstash.conf
+    volumes:
+        - "./logstash.conf:/config-dir/logstash.conf"
+    ports:
+      - "9600:9600"
+      - "7777:7777"
+    links:
+      - elasticsearch
+      - kafka
+
